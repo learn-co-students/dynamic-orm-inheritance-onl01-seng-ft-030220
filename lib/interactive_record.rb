@@ -20,16 +20,38 @@ class InteractiveRecord
     column_names.compact
   end
 
-  def initialize(options={})
-    options.each do |property, value|
-      self.send("#{property}=", value)
+  def self.all
+    all = DB[:conn].execute("SELECT * FROM #{self.table_name}")
+
+    all.map do |row|
+      self.new(row)
     end
   end
 
-  def save
-    sql = "INSERT INTO #{table_name_for_insert} (#{col_names_for_insert}) VALUES (#{values_for_insert})"
+  def initialize(options={})
+    options.each do |property, value|
+      self.send("#{property}=", value) if self.methods.include?("#{property}=".to_sym)
+    end
+  end
+
+  def update
+    sql = <<-SQL
+    UPDATE #{self.table_name_for_insert} 
+    SET #{self.values_for_update} 
+    WHERE id = #{self.id};
+    SQL
+
     DB[:conn].execute(sql)
-    @id = DB[:conn].execute("SELECT last_insert_rowid() FROM #{table_name_for_insert}")[0][0]
+  end
+
+  def save
+    if self.id
+      self.update
+    else
+      sql = "INSERT INTO #{table_name_for_insert} (#{col_names_for_insert}) VALUES (#{values_for_insert})"
+      DB[:conn].execute(sql)
+      @id = DB[:conn].execute("SELECT last_insert_rowid() FROM #{table_name_for_insert}")[0][0]
+    end
   end
 
   def table_name_for_insert
@@ -42,6 +64,13 @@ class InteractiveRecord
       values << "'#{send(col_name)}'" unless send(col_name).nil?
     end
     values.join(", ")
+  end
+
+  def values_for_update
+    columns = self.class.column_names.delete_if {|col| col == "id"}
+    values = columns.map do |column|
+      "#{column} = '#{self.send(column)}'"
+    end.join(', ')
   end
 
   def col_names_for_insert
