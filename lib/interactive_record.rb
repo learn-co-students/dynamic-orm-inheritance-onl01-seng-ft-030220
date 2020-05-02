@@ -1,4 +1,4 @@
-require_relative "../config/environment.rb"
+table_name_for_insertrequire_relative "../config/environment.rb"
 require 'active_support/inflector'
 
 class InteractiveRecord
